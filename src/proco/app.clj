@@ -57,7 +57,7 @@
                     ;; add new job to queue
                     [[incoming-jobs updated-job]]
                     ;; return :incoming-queue-full if the post fails
-                    ::default ::incoming-queue-full)]
+                    :default ::incoming-queue-full)]
       (log/debug (format "val: %s" val))
       ;; check if
       (condp = val
