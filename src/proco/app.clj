@@ -9,6 +9,9 @@
             [taoensso.timbre :as log]
             [liberator.dev :refer [wrap-trace]]))
 
+
+;; todos:
+;; store timestamps for significant events for later metrics
 (def ^:dynamic *config*
   "The options that define the runtime characteristics of this service"
   {:incoming-jobs-size 2
@@ -33,6 +36,8 @@
   been processed. Only the most basic onboarding has been done"
   (chan incoming-jobs-buffer))
 
+(defn timestamp [] (System/currentTimeMillis))
+
 (defn queue-job
   "Adds a job to the incoming queue.
 
@@ -45,11 +50,15 @@
   [job]
   (log/debug (format "queueing: %s" job))
   (let [status-chan (-> :status-chan-size get-config sliding-buffer chan)]
-    (let [;; get the next job id. These ids are local to the service.
+    (let [ ;; get the next job id. These ids are local to the service.
+          ts (timestamp)
           id (dosync (alter last-job-id inc) @last-job-id)
           ;; augment the job map with id and a status channel to
           ;; report events
-          updated-job (assoc job :id id :status-chan status-chan)
+          updated-job (assoc job
+                        :id id
+                        :status-chan status-chan
+                        :ts-incoming-queue ts)
           ;; either add the new job to the incoming queue, or return a
           ;; fail value if the queue can't take it
           _ (log/debug (format "Updated job: %s" updated-job))
