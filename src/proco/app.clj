@@ -68,10 +68,14 @@
                     ;; return :incoming-queue-full if the post fails
                     :default ::incoming-queue-full)]
       (log/debug (format "val: %s" val))
-      ;; check if
+      ;; check if the post succeded, if it didn't, return a flag
+      ;; indicating that the service is currently not available
       (condp = val
-        ::incoming-queue-full {::service-not-available true
-                               :x-status-detail "job queue full "}
+        ::incoming-queue-full
+        (do
+          (log/warn "Queue is full. Not accepting request id:" id)
+          {::service-not-available true
+           :x-status-detail "job queue full "})
         true {:job-id id}
         :default true))))
 
