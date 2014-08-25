@@ -15,7 +15,9 @@
 (def ^:dynamic *config*
   "The options that define the runtime characteristics of this service"
   {:incoming-jobs-size 2
-   :status-chan-size 25})
+   :status-chan-size 25
+   :scheduled-tasks-size 5
+   :finished-tasks-size 5})
 
 (defn get-config
   "Helper to get config parameters"
@@ -23,17 +25,33 @@
   (get *config* k :config-not-found))
 
 (def last-job-id (ref 0))
+(defn next-job-id []
+  (dosync (alter last-job-id inc) @last-job-id))
+
+(def last-task-id (ref 0))
+(defn next-task-id []
+    (dosync (alter last-task-id inc) @last-task-id))
+
 (def in-flight-jobs (ref []))
 (def finished-jobs (ref []))
 
+(def finished-tasks-buffer
+  (async/buffer (get-config :finished-tasks-size)))
 
+(def finished-tasks (chan finished-tasks-buffer))
+
+(def scheduled-tasks-buffer
+  (async/buffer (get-config :scheduled-tasks-size)))
+
+(def scheduled-tasks (chan scheduled-tasks-buffer))
+
+;; Buffer counterpart to `incoming-jobs`
 (def incoming-jobs-buffer
-  "Buffer counterpart to `incoming-jobs`"
   (async/buffer (get-config :incoming-jobs-size )))
 
+;; A Channel that holds the jobs that have just arrived but haven't
+;; been processed. Only the most basic onboarding has been done
 (def incoming-jobs
-  "A Channel that holds the jobs that have just arrived but haven't
-  been processed. Only the most basic onboarding has been done"
   (chan incoming-jobs-buffer))
 
 (defn timestamp [] (System/currentTimeMillis))
@@ -67,6 +85,7 @@
                     [[incoming-jobs updated-job]]
                     ;; return :incoming-queue-full if the post fails
                     :default ::incoming-queue-full)]
+      (log/debug "here!")
       (log/debug (format "val: %s" val))
       ;; check if the post succeded, if it didn't, return a flag
       ;; indicating that the service is currently not available
@@ -122,6 +141,7 @@
   (-> app 
       (wrap-params)))
 
+
 ;; server runtime
 (defonce server (run-jetty #'handler {:port 3000 :join? false}))
 (defn stop-server [] (.stop server))
@@ -135,7 +155,55 @@
                 :content-type :json
                 :body (json/generate-string job)}))
 
-(defn submit-test []
-  (let [payload (submit-job {:a 1})]
+(defn submit-test [job]
+  (let [payload (submit-job job)]
     (log/debug "received response" payload)
     (json/parse-string (:body payload) true)))
+
+
+;;;; TEST REDUCER
+(def job-processor
+  (flatmap
+   (fn [{:keys [id tasks]}]
+     (log/debugf "job-processor: job-id: %s #tasks: %s" id (count tasks))
+     (let [ret
+           (into []
+                 (map #(let [task (merge % {:job-id id
+                                            :id (next-task-id)
+                                            :ts-created (timestamp)})]
+                         (log/debugf "enqueuing task id: %s from job: %s" (:id task) id)
+                         task)
+                      tasks))]
+       (log/debugf "job-processor ret: %s" ret)
+       ret))))
+
+(def out (chan))
+
+(defn exhndlr [e]
+  (log/error "job-to-task-pipeline" e))
+
+(def job-to-task-pipeline 
+  (async/pipeline 1 scheduled-tasks job-processor incoming-jobs false exhndlr))
+
+(defn get-output []
+  (<!! scheduled-tasks))
+
+(defonce drain? (atom true))
+(defn output-drainer []
+  (let [t (Thread. (fn []
+                     (async/go
+                       (while @drain?
+                         (let [o (async/<! scheduled-tasks)
+                               o (assoc o :ts-exit (timestamp))
+                               duration (- (:ts-exit o)
+                                           (:ts-created o))
+                               o (assoc o :duration duration)]
+                           (log/infof "Output: %s" o))))))]
+    (.start t)
+    t))
+
+(defn build-job [id n]
+  {:id id
+   :tasks
+   (for [t (range n)]
+     {:do (format "job %s: task %s of %s" id t n)})})
