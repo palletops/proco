@@ -155,12 +155,16 @@
 (defn exhndlr [e]
   (log/error "job-to-task-pipeline" e))
 
-(defn chan-drain [c]
+
+;;;; Stuff for testing
+(defn chan-drain
+  "Builds a go process to drain a channel"
+  [c]
   (let [ctr (async/chan)]
     (async/go-loop []
       (let [[val port] (async/alts! [c ctr])]
         (when (not (= port ctr))
-          (let [o (async/<! c )
+          (let [o val
                 o (assoc o :ts-exit (timestamp))
                 duration (- (:ts-exit o)
                             (:ts-created o))
