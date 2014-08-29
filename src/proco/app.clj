@@ -123,21 +123,28 @@
       (wrap-params)))
 
 ;; client
-(defn submit-job [port job]
-  (client/post (format "http://localhost:%s/job" port)
-               {:accept :json
-                :content-type :json
-                :body (json/generate-string job)}))
+(defn submit-job [cm port job]
+  (try (client/post (format "http://localhost:%s/job" port)
+                    {:accept :json
+                     :content-type :json
+                     :body (json/generate-string job)
+                     :connection-manager cm})
+       (catch Exception e
+         (println "Got a 503 ")
+         e)))
 
-(defn submit-test [port job]
-  (let [payload (submit-job port job)]
+(defn submit-test [cm port job]
+  (let [payload (submit-job cm port job)]
     (log/debug "received response" payload)
     (json/parse-string (:body payload) true)))
 
 
-(defn submit-tests [port jobs]
-  (doseq [j jobs]
-    (submit-test port j)))
+(defn submit-tests
+  [port jobs & [conf]]
+  (let [cm-conf (merge {:timeout 100 :threads 25} conf)
+        cm (clj-http.conn-mgr/make-reusable-conn-manager cm-conf)]
+    (doseq [j jobs]
+      (submit-test cm port j))))
 
 ;;; job-to-task-processor
 (defn job-processor [task-id-chan]
