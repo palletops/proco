@@ -135,6 +135,10 @@
     (json/parse-string (:body payload) true)))
 
 
+(defn submit-tests [port jobs]
+  (doseq [j jobs]
+    (submit-test port j)))
+
 ;;; job-to-task-processor
 (defn job-processor [task-id-chan]
   (flatmap
@@ -173,13 +177,21 @@
             (recur)))))
     ctr))
 
-(defn build-job [id n]
+(defn build-job
+  "Builds a job with id and n tasks"
+  [id n]
   {:id id
    :tasks
    (for [t (range n)]
      {:do (format "job %s: task %s of %s" id t n)})})
 
+(defn build-jobs [initial-id n-jobs n-tasks-per-job]
+  (for [n (range n-jobs)]
+    (build-job (+ initial-id n) n-tasks-per-job)))
+
 (defn id-chan
+  "Builds a process that produces and pushes to a channel the sequence
+  of naturals starting from n"
   ([c] (id-chan c 1))
   ([c n]
      (async/go-loop [i n]
