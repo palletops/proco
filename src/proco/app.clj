@@ -152,13 +152,12 @@
    (fn [{:keys [id tasks]}]
      (log/debugf "job-processor: job-id: %s #tasks: %s" id (count tasks))
      (let [ret
-           (into []
-                 (map #(let [task (merge % {:job-id id
-                                            :id (<!! task-id-chan)
-                                            :ts-created (timestamp)})]
-                         (log/debugf "enqueuing task id: %s from job: %s" (:id task) id)
-                         task)
-                      tasks))]
+           (map #(let [task (merge % {:job-id id
+                                      :id (<!! task-id-chan)
+                                      :ts-created (timestamp)})]
+                   (log/debugf "enqueuing task id: %s from job: %s" (:id task) id)
+                   task)
+                tasks)]
        ;; (log/debugf "job-processor ret: %s" ret)
        ret))))
 
