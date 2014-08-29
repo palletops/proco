@@ -54,7 +54,7 @@
                       :ts-incoming-queue ts)
         ;; either add the new job to the incoming queue, or return a
         ;; fail value if the queue can't take it
-        _ (log/debug (format "Updated job: %s" updated-job))
+        ;; _ (log/debug (format "Updated job: %s" updated-job))
         [val ch] (try (alts!!
                        ;; add new job to queue
                        [[incoming-jobs updated-job]]
@@ -62,7 +62,7 @@
                        :default ::incoming-queue-full)
                       (catch Throwable t
                         (log/error "Error adding job to incoming queue: " t)))]
-    (log/debug (format "val: %s" val))
+    ;; (log/debug (format "val: %s" val))
     ;; check if the post succeded, if it didn't, return a flag
     ;; indicating that the service is currently not available
     (condp = val
@@ -148,7 +148,7 @@
                          (log/debugf "enqueuing task id: %s from job: %s" (:id task) id)
                          task)
                       tasks))]
-       (log/debugf "job-processor ret: %s" ret)
+       ;; (log/debugf "job-processor ret: %s" ret)
        ret))))
 
 
