@@ -205,27 +205,28 @@
        (async/>! c i)
        (recur (inc i)))))
 
+;; A proco component is a pipeline (but not an async/pipeline, yet) that takes an input channel (incoming-jobs-chan), an output channel (finished-task-chan) and a configuration map. It builds 
 (defrecord ProcoComponent [config incoming-jobs-chan finished-tasks-chan]
   com.palletops.leaven.protocols/ILifecycle
-  (start [{:keys [ conf] :as component}]
+  (start [{:keys [conf] :as component}]
     (let [scheduled-tasks-buffer (async/buffer (get-config config :scheduled-tasks-size))
           scheduled-tasks-chan (chan scheduled-tasks-buffer)]
-      (merge conf
-             {:state
-              {:finished-tasks-chan finished-tasks-chan
-               :scheduled-tasks-buffer scheduled-tasks-buffer
-               :scheduled-tasks-chan scheduled-tasks-chan
-               :incoming-jobs-chan incoming-jobs-chan
-               :jobs-to-task
-               (let [ic (chan)]
-                 (id-chan ic (get-config config :initial-task-id) )
-                 (async/pipeline
-                  (get-config conf :job-to-tasks-threads)
-                  finished-tasks-chan
-                  (job-processor ic)
-                  incoming-jobs-chan
-                  false ;; don't shut it down if input is closed
-                  exhndlr))}}))))
+      (assoc component
+        :state
+        {:finished-tasks-chan finished-tasks-chan
+         :scheduled-tasks-buffer scheduled-tasks-buffer
+         :scheduled-tasks-chan scheduled-tasks-chan
+         :incoming-jobs-chan incoming-jobs-chan
+         :jobs-to-task
+         (let [ic (chan)]
+           (id-chan ic (get-config config :initial-task-id) )
+           (async/pipeline
+            (get-config conf :job-to-tasks-threads)
+            finished-tasks-chan
+            (job-processor ic)
+            incoming-jobs-chan
+            false ;; don't shut it down if input is closed
+            exhndlr))}))))
 
 (defn proco-component
   [conf incoming-jobs-chan finished-tasks-chan]
