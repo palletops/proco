@@ -8,4 +8,7 @@
                  [clj-http "1.0.0"]
 		 [ring/ring-core "1.3.0"]
                  [com.taoensso/timbre "3.2.1"]
-                 [ring/ring-jetty-adapter "1.3.0"]])  
+                 [ring/ring-jetty-adapter "1.3.0"]
+                 [com.palletops/leaven "0.1.0-SNAPSHOT"]
+;;                 [com.palletops/api-builder "0.3.0"]
+                 [com.palletops/bakery-jetty "0.1.0-SNAPSHOT"]])  
