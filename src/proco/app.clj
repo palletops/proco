@@ -8,6 +8,7 @@
             [taoensso.timbre :as log]
             [liberator.dev :refer [wrap-trace]]
             [com.palletops.leaven :as leaven]
+            [com.palletops.leaven.protocols :refer [start stop]]
             [com.palletops.bakery.jetty :as jetty]))
 
 
@@ -255,3 +256,14 @@
                     {:config http-config
                      :handler ring-handler} )
       :processor processor})))
+
+(defn test-starter [port & [drain?]]
+  (let [output-chan (async/chan 10)
+        component
+        {:output-chan output-chan
+         :component
+         (start
+          (proco {:http-config {:port port}} output-chan))}]
+    (if drain?
+      (assoc component :drain-ctrl (chan-drain output-chan))
+      component)))
